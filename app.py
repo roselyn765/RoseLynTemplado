@@ -1,28 +1,21 @@
-from flask import Flask, jsonify, request, render_template_string, redirect, session
+from flask import Flask, jsonify, request, render_template_string, session, redirect
 import sqlite3
+import os
 
 app = Flask(__name__)
-app.secret_key = "secretkey123"
+app.secret_key = "secret123"
+DB = "students.db"
 
 
-# DATABASE
 def init_db():
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB)
     cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT,
-        password TEXT
-    )
-    """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS students(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        grade TEXT,
+        grade INTEGER,
         section TEXT
     )
     """)
@@ -30,153 +23,183 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
 
 
-# LOGIN PAGE
-@app.route("/")
-def login_page():
-    if "user" in session:
-        return redirect("/dashboard")
+login_page = """
+<html>
+<head>
+<title>Login</title>
 
-    return render_template_string("""
-
-<h2>Login</h2>
-
-<input id="user" placeholder="Username"><br><br>
-<input id="pass" type="password" placeholder="Password"><br><br>
-
-<button onclick="login()">Login</button>
-<button onclick="register()">Register</button>
-
-<script>
-
-function login(){
-
-fetch('/login',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({
-username:document.getElementById("user").value,
-password:document.getElementById("pass").value
-})
-})
-.then(res=>res.json())
-.then(data=>{
-alert(data.message)
-if(data.success){
-location.href='/dashboard'
-}
-})
-
+<style>
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#FFC0CB,#FFB6C1);
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+color:white;
 }
 
-function register(){
-
-fetch('/register',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({
-username:document.getElementById("user").value,
-password:document.getElementById("pass").value
-})
-})
-.then(res=>res.json())
-.then(data=>{
-alert(data.message)
-})
-
+.box{
+background:rgba(255,255,255,0.25);
+padding:40px;
+border-radius:15px;
+backdrop-filter:blur(10px);
+box-shadow:0 0 20px rgba(0,0,0,0.2);
 }
 
-</script>
+input{
+padding:10px;
+margin:10px;
+border:none;
+border-radius:5px;
+width:200px;
+}
 
-""")
+button{
+padding:10px 20px;
+border:none;
+background:#FF69B4;
+color:white;
+border-radius:5px;
+cursor:pointer;
+font-weight:bold;
+}
+
+button:hover{
+background:#FF1493;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>Admin Login</h2>
+
+<form method="POST">
+
+<input name="username" placeholder="Username"><br>
+<input name="password" type="password" placeholder="Password"><br>
+
+<button>Login</button>
+
+</form>
+
+</div>
+
+</body>
+</html>
+"""
 
 
-# REGISTER
-@app.route("/register", methods=["POST"])
-def register():
-    data = request.json
+dashboard = """
+<!DOCTYPE html>
+<html>
+<head>
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
+<title>Student Manager</title>
 
-    cur.execute("INSERT INTO users(username,password) VALUES(?,?)",
-                (data["username"], data["password"]))
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    conn.commit()
-    conn.close()
+<style>
 
-    return jsonify({"message":"Registered successfully"})
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#FFC0CB,#FFB6C1);
+color:white;
+text-align:center;
+padding:30px;
+}
 
+.container{
+background:rgba(255,255,255,0.25);
+padding:25px;
+border-radius:15px;
+width:750px;
+margin:auto;
+backdrop-filter:blur(10px);
+box-shadow:0 0 20px rgba(0,0,0,0.2);
+}
 
-# LOGIN
-@app.route("/login", methods=["POST"])
-def login():
+input{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:5px;
+}
 
-    data = request.json
+button{
+padding:8px 12px;
+margin:4px;
+border:none;
+border-radius:5px;
+cursor:pointer;
+font-weight:bold;
+}
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
+.add{background:#FF69B4;color:white;}
+.edit{background:#FFB6C1;color:black;}
+.delete{background:#FF1493;color:white;}
 
-    cur.execute("SELECT * FROM users WHERE username=? AND password=?",
-                (data["username"], data["password"]))
+table{
+width:100%;
+margin-top:20px;
+border-collapse:collapse;
+background:rgba(255,255,255,0.15);
+}
 
-    user = cur.fetchone()
+th,td{
+padding:10px;
+border-bottom:1px solid rgba(255,255,255,0.3);
+}
 
-    conn.close()
+th{
+background:rgba(255,255,255,0.25);
+}
 
-    if user:
-        session["user"] = user[1]
-        return jsonify({"success":True,"message":"Login successful"})
-    else:
-        return jsonify({"success":False,"message":"Invalid login"})
+</style>
 
+</head>
 
-# DASHBOARD
-@app.route("/dashboard")
-def dashboard():
+<body>
 
-    if "user" not in session:
-        return redirect("/")
+<h1>Student Manager</h1>
 
-    return render_template_string("""
+<div class="container">
 
-<h1>Student Management Dashboard</h1>
+<input id="search" placeholder="Search student..." onkeyup="searchStudent()">
 
-<button onclick="logout()">Logout</button>
+<h3>Add / Edit Student</h3>
 
-<h3>Add Student</h3>
-
+<input id="id" placeholder="ID (for update)">
 <input id="name" placeholder="Name">
 <input id="grade" placeholder="Grade">
 <input id="section" placeholder="Section">
 
-<button onclick="addStudent()">Add</button>
+<br>
 
-<br><br>
+<button class="add" onclick="addStudent()">Add</button>
+<button class="edit" onclick="updateStudent()">Update</button>
 
-<input id="search" placeholder="Search student">
-<button onclick="searchStudent()">Search</button>
-<button onclick="loadStudents()">Refresh</button>
+<h3>Students</h3>
 
-<table border="1" width="60%">
-<thead>
-<tr>
-<th>ID</th>
-<th>Name</th>
-<th>Grade</th>
-<th>Section</th>
-<th>Action</th>
-</tr>
-</thead>
+<table id="table"></table>
 
-<tbody id="table"></tbody>
+<h3>Grade Chart</h3>
 
-</table>
+<canvas id="chart"></canvas>
 
+</div>
 
 <script>
+
+let students=[]
+let chart
 
 function loadStudents(){
 
@@ -184,8 +207,31 @@ fetch('/students')
 .then(res=>res.json())
 .then(data=>{
 
+students=data
+drawTable(data)
+
+let names=data.map(s=>s.name)
+let grades=data.map(s=>s.grade)
+
+drawChart(names,grades)
+
+})
+
+}
+
+function drawTable(data){
+
 let table=document.getElementById("table")
-table.innerHTML=""
+
+table.innerHTML=`
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Grade</th>
+<th>Section</th>
+<th>Action</th>
+</tr>
+`
 
 data.forEach(s=>{
 
@@ -196,166 +242,192 @@ table.innerHTML+=`
 <td>${s.grade}</td>
 <td>${s.section}</td>
 <td>
-<button onclick="deleteStudent(${s.id})">Delete</button>
+<button class="edit" onclick="fillForm(${s.id},'${s.name}','${s.grade}','${s.section}')">Edit</button>
+<button class="delete" onclick="deleteStudent(${s.id})">Delete</button>
 </td>
 </tr>
 `
 
 })
 
+}
+
+function fillForm(id,name,grade,section){
+
+document.getElementById("id").value=id
+document.getElementById("name").value=name
+document.getElementById("grade").value=grade
+document.getElementById("section").value=section
+
+}
+
+function searchStudent(){
+
+let q=document.getElementById("search").value.toLowerCase()
+
+let filtered=students.filter(s=>s.name.toLowerCase().includes(q))
+
+drawTable(filtered)
+
+}
+
+function drawChart(names,grades){
+
+if(chart) chart.destroy()
+
+chart=new Chart(document.getElementById("chart"),{
+type:"bar",
+data:{
+labels:names,
+datasets:[{
+label:"Grade Level",
+data:grades,
+backgroundColor:"#FF69B4"
+}]
+}
 })
 
 }
 
-
 function addStudent(){
 
-fetch('/add_student',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
+fetch("/students",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
 name:document.getElementById("name").value,
 grade:document.getElementById("grade").value,
 section:document.getElementById("section").value
 })
-})
-.then(res=>res.json())
-.then(data=>{
-alert(data.message)
-loadStudents()
-})
+}).then(()=>loadStudents())
 
 }
 
+function updateStudent(){
+
+let id=document.getElementById("id").value
+
+fetch("/students/"+id,{
+method:"PUT",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+name:document.getElementById("name").value,
+grade:document.getElementById("grade").value,
+section:document.getElementById("section").value
+})
+}).then(()=>loadStudents())
+
+}
 
 function deleteStudent(id){
 
-fetch('/delete/'+id,{
-method:'DELETE'
-})
-.then(res=>res.json())
-.then(data=>{
-alert(data.message)
-loadStudents()
-})
+fetch("/students/"+id,{
+method:"DELETE"
+}).then(()=>loadStudents())
 
-}
-
-
-function searchStudent(){
-
-let name=document.getElementById("search").value
-
-fetch('/search?name='+name)
-.then(res=>res.json())
-.then(data=>{
-
-let table=document.getElementById("table")
-table.innerHTML=""
-
-data.forEach(s=>{
-
-table.innerHTML+=`
-<tr>
-<td>${s.id}</td>
-<td>${s.name}</td>
-<td>${s.grade}</td>
-<td>${s.section}</td>
-<td>-</td>
-</tr>
-`
-
-})
-
-})
-
-}
-
-
-function logout(){
-location.href="/logout"
 }
 
 loadStudents()
 
 </script>
 
-""")
+</body>
+</html>
+"""
 
 
-# GET STUDENTS
-@app.route("/students")
-def students():
+@app.route("/", methods=["GET","POST"])
+def login():
 
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+    if request.method=="POST":
+
+        if request.form["username"]=="admin" and request.form["password"]=="1234":
+            session["user"]="admin"
+            return redirect("/dashboard")
+
+    return login_page
+
+
+@app.route("/dashboard")
+def home():
+
+    if "user" not in session:
+        return redirect("/")
+
+    return render_template_string(dashboard)
+
+
+@app.route("/students", methods=["GET"])
+def get_students():
+
+    conn=sqlite3.connect(DB)
+    cur=conn.cursor()
 
     cur.execute("SELECT * FROM students")
-    rows = cur.fetchall()
+
+    rows=cur.fetchall()
 
     conn.close()
 
-    return jsonify([dict(row) for row in rows])
+    students=[{"id":r[0],"name":r[1],"grade":r[2],"section":r[3]} for r in rows]
+
+    return jsonify(students)
 
 
-# ADD STUDENT
-@app.route("/add_student", methods=["POST"])
+@app.route("/students", methods=["POST"])
 def add_student():
 
-    data = request.json
+    data=request.get_json()
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
+    conn=sqlite3.connect(DB)
+    cur=conn.cursor()
 
-    cur.execute("INSERT INTO students(name,grade,section) VALUES(?,?,?)",
-                (data["name"],data["grade"],data["section"]))
+    cur.execute(
+        "INSERT INTO students(name,grade,section) VALUES(?,?,?)",
+        (data["name"],data["grade"],data["section"])
+    )
 
     conn.commit()
     conn.close()
 
-    return jsonify({"message":"Student added"})
+    return jsonify({"message":"added"})
 
 
-# DELETE
-@app.route("/delete/<int:id>", methods=["DELETE"])
+@app.route("/students/<int:id>", methods=["PUT"])
+def update_student(id):
+
+    data=request.get_json()
+
+    conn=sqlite3.connect(DB)
+    cur=conn.cursor()
+
+    cur.execute(
+        "UPDATE students SET name=?, grade=?, section=? WHERE id=?",
+        (data["name"],data["grade"],data["section"],id)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message":"updated"})
+
+
+@app.route("/students/<int:id>", methods=["DELETE"])
 def delete_student(id):
 
-    conn = sqlite3.connect("database.db")
-    cur = conn.cursor()
+    conn=sqlite3.connect(DB)
+    cur=conn.cursor()
 
-    cur.execute("DELETE FROM students WHERE id=?",(id,))
+    cur.execute("DELETE FROM students WHERE id=?", (id,))
 
     conn.commit()
     conn.close()
 
-    return jsonify({"message":"Student deleted"})
-
-
-# SEARCH
-@app.route("/search")
-def search():
-
-    name = request.args.get("name")
-
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM students WHERE name LIKE ?",('%'+name+'%',))
-    rows = cur.fetchall()
-
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-
-# LOGOUT
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
+    return jsonify({"message":"deleted"})
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    port=int(os.environ.get("PORT",5000))
+
+    app.run(host="0.0.0.0",port=port)
