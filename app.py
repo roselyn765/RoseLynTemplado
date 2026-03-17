@@ -1,3 +1,4 @@
+```python
 from flask import Flask, jsonify, request, render_template_string, session, redirect
 import sqlite3
 import os
@@ -40,15 +41,19 @@ display:flex;
 justify-content:center;
 align-items:center;
 height:100vh;
-color:white;
 }
 
 .box{
-background:rgba(255,255,255,0.25);
+background:rgba(255,255,255,0.35);
 padding:40px;
 border-radius:15px;
 backdrop-filter:blur(10px);
-box-shadow:0 0 20px rgba(0,0,0,0.2);
+box-shadow:0 0 15px rgba(0,0,0,0.2);
+text-align:center;
+}
+
+h2{
+color:#8B004B;
 }
 
 input{
@@ -111,13 +116,17 @@ dashboard = """
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#FFC0CB,#FFB6C1);
-color:white;
+color:#333;
 text-align:center;
 padding:30px;
 }
 
+h1,h2,h3{
+color:#8B004B;
+}
+
 .container{
-background:rgba(255,255,255,0.25);
+background:rgba(255,255,255,0.35);
 padding:25px;
 border-radius:15px;
 width:750px;
@@ -143,23 +152,25 @@ font-weight:bold;
 }
 
 .add{background:#FF69B4;color:white;}
-.edit{background:#FFB6C1;color:black;}
+.edit{background:#FFC0CB;color:black;}
 .delete{background:#FF1493;color:white;}
 
 table{
 width:100%;
 margin-top:20px;
 border-collapse:collapse;
-background:rgba(255,255,255,0.15);
+background:rgba(255,255,255,0.3);
+}
+
+th{
+background:#FFB6C1;
+color:#5a0030;
 }
 
 th,td{
 padding:10px;
-border-bottom:1px solid rgba(255,255,255,0.3);
-}
-
-th{
-background:rgba(255,255,255,0.25);
+border-bottom:1px solid rgba(0,0,0,0.1);
+color:#333;
 }
 
 </style>
@@ -431,3 +442,4 @@ if __name__ == "__main__":
     port=int(os.environ.get("PORT",5000))
 
     app.run(host="0.0.0.0",port=port)
+```
